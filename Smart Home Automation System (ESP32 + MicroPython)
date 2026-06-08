@@ -1,0 +1,91 @@
+import network
+import socket
+from machine import Pin
+import time
+
+light = Pin(26, Pin.OUT)
+fan = Pin(27, Pin.OUT)
+buzzer = Pin(25, Pin.OUT)
+button = Pin(14, Pin.IN, Pin.PULL_UP)
+
+ssid = "Prithvi"
+password = "Brahmos23"
+
+wifi = network.WLAN(network.STA_IF)
+wifi.active(True)
+wifi.connect(ssid, password)
+
+print("Connecting WiFi...")
+
+while not wifi.isconnected():
+    time.sleep(1)
+
+print("Connected:", wifi.ifconfig())
+
+addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
+s = socket.socket()
+s.bind(addr)
+s.listen(1)
+
+print("Server Ready")
+
+
+def beep():
+    buzzer.value(1)
+    time.sleep(0.2)
+    buzzer.value(0)
+
+while True:
+
+    
+    if button.value() == 0:
+        light.value(1)
+        fan.value(1)
+        beep()
+    else:
+        light.value(0)
+        fan.value(0)
+
+    cl, addr = s.accept()
+    request = str(cl.recv(1024))
+
+    if "/lighton" in request:
+        light.value(1)
+
+    if "/lightoff" in request:
+        light.value(0)
+
+    if "/fanon" in request:
+        fan.value(1)
+
+    if "/fanoff" in request:
+        fan.value(0)
+
+    if "/beep" in request:
+        beep()
+
+    # -------- HTML UI --------
+    html = """
+    <html>
+    <head><title>Smart Home</title></head>
+    <body>
+    <h1>🏠 ESP32 Smart Home Automation</h1>
+
+    <h2>Light</h2>
+    <a href="/lighton"><button>ON</button></a>
+    <a href="/lightoff"><button>OFF</button></a>
+
+    <h2>Fan</h2>
+    <a href="/fanon"><button>ON</button></a>
+    <a href="/fanoff"><button>OFF</button></a>
+
+    <h2>Buzzer</h2>
+    <a href="/beep"><button>Beep</button></a>
+
+    </body>
+    </html>
+    """
+
+    cl.send("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n")
+    cl.send(html)
+    cl.close()
